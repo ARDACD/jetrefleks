@@ -91,6 +91,9 @@
 <body>
 
 <video id="videoEl" autoplay playsinline muted></video>
+<audio id="bgMusic" loop preload="auto">
+    <source src="bg.mp3" type="audio/mpeg">
+</audio>
 <canvas id="gameCanvas"></canvas>
 
 <div id="score-box">
@@ -570,6 +573,9 @@ function startGame() {
   gameoverScreen.style.display = 'none';
   startScreen.style.display = 'none';
 
+  bgMusic.currentTime=0;
+  bgMusic.play().catch(e=>{console.log("Müzik oynatılamadı: ", e);});
+
   startCountdown(() => {
     gameState = 'playing';
     scheduleFruit();
@@ -585,6 +591,8 @@ function endGame() {
   gameState = 'over';
   clearTimeout(fruitTimer);
   fruits = [];
+  bgMusic.pause();
+  bgMusic.currentTime=0;
   finalScoreEl.textContent = 'Puan: ' + score;
   gameoverScreen.style.display = 'flex';
   startAutoRestart();
