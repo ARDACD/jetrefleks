@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meyve Yakala!</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; width:100vw; height:100vh; font-family:'Courier New',monospace; user-select:none; }
+
+  #videoEl {
+    position:fixed; top:0; left:0; width:100vw; height:100vh;
+    object-fit:cover; transform:scaleX(-1); z-index:1;
+  }
+  #gameCanvas {
+    position:fixed; top:0; left:0; width:100vw; height:100vh;
+    z-index:2; pointer-events:none;
+  }
+
+  /* HUD */
+  #score-box {
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    z-index:10; text-align:center;
+  }
+  #score-label { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.4); text-transform:uppercase; }
+  #score-val   { font-size:52px; font-weight:bold; color:#fff; line-height:1; text-shadow:0 0 30px rgba(255,255,100,0.6); }
+
+  #combo-box {
+    position:fixed; top:90px; left:50%; transform:translateX(-50%);
+    z-index:10; font-size:16px; color:#facc15; letter-spacing:0.1em;
+    opacity:0; transition:opacity 0.3s;
+  }
+  #combo-box.show { opacity:1; }
+
+  #lives-box {
+    position:fixed; top:16px; left:16px; z-index:10;
+    font-size:28px; letter-spacing:4px;
+  }
+
+  #status {
+    position:fixed; top:16px; right:16px; z-index:10;
+    font-size:11px; letter-spacing:0.12em; padding:4px 13px;
+    border-radius:20px; border:1px solid; transition:all 0.4s; text-transform:uppercase;
+  }
+  #status.loading { color:#facc15; border-color:#facc15; background:rgba(0,0,0,0.7); }
+  #status.ready   { color:#4ade80; border-color:#4ade80; background:rgba(0,0,0,0.7); }
+  #status.noperson{ color:#a78bfa; border-color:#a78bfa; background:rgba(0,0,0,0.7); }
+  #status.error   { color:#f87171; border-color:#f87171; background:rgba(0,0,0,0.7); }
+
+  /* Start screen */
+  #start-screen {
+    position:fixed; inset:0; z-index:30; background:rgba(5,5,15,0.96);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+  }
+  #start-screen h1 { font-size:36px; color:#fff; letter-spacing:0.1em; }
+  #start-screen p  { font-size:13px; color:rgba(255,255,255,0.4); letter-spacing:0.08em; text-align:center; line-height:1.9; }
+  #start-btn {
+    background:transparent; border:2px solid #facc15; color:#facc15;
+    font-family:'Courier New',monospace; font-size:14px; letter-spacing:0.2em;
+    padding:14px 40px; border-radius:4px; cursor:pointer; transition:all 0.3s; text-transform:uppercase;
+    margin-top:8px;
+  }
+  #start-btn:hover { background:rgba(250,204,21,0.12); box-shadow:0 0 28px rgba(250,204,21,0.25); }
+
+  /* Game over */
+  #gameover-screen {
+    position:fixed; inset:0; z-index:30; background:rgba(5,5,15,0.95);
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  #gameover-screen h2 { font-size:42px; color:#f87171; letter-spacing:0.1em; }
+  #final-score { font-size:22px; color:#fff; }
+  #restart-btn {
+    background:transparent; border:2px solid #4ade80; color:#4ade80;
+    font-family:'Courier New',monospace; font-size:13px; letter-spacing:0.2em;
+    padding:12px 34px; border-radius:4px; cursor:pointer; transition:all 0.3s; text-transform:uppercase;
+  }
+  #restart-btn:hover { background:rgba(74,222,128,0.1); }
+  #auto-restart { font-size:12px; color:rgba(255,255,255,0.35); letter-spacing:0.1em; margin-top:2px; }
+  #auto-bar-wrap { width:200px; height:3px; background:rgba(255,255,255,0.12); border-radius:2px; overflow:hidden; }
+  #auto-bar { height:100%; background:#4ade80; width:100%; }
+
+  /* Countdown */
+  #countdown {
+    position:fixed; inset:0; z-index:25; display:none;
+    align-items:center; justify-content:center;
+    font-size:120px; font-weight:bold; color:#fff;
+    text-shadow:0 0 60px rgba(255,255,255,0.5);
+  }
+</style>
+</head>
+<body>
+
+<video id="videoEl" autoplay playsinline muted></video>
+<canvas id="gameCanvas"></canvas>
+
+<div id="score-box">
+  <div id="score-label">PUAN</div>
+  <div id="score-val">0</div>
+</div>
+<div id="combo-box" id="combo-box">🔥 COMBO x<span id="combo-val">2</span></div>
+<div id="lives-box">❤️❤️❤️</div>
+<div id="status" class="loading">Yükleniyor</div>
+
+<div id="start-screen">
+  <div style="font-size:64px">🍎🍉🍓</div>
+  <h1>MEYVE YAKALA!</h1>
+  <p>Ellerinle havadaki meyveleri yakala.<br>Her meyve 10 puan — kaçırırsan can kaybedersin!</p>
+  <button id="start-btn">▶ OYNA</button>
+</div>
+
+<div id="gameover-screen">
+  <div style="font-size:64px">💀</div>
+  <h2>GAME OVER</h2>
+  <div id="final-score">Puan: 0</div>
+  <button id="restart-btn">↺ Tekrar Oyna</button>
+  <div id="auto-restart">5 saniyede otomatik başlıyor…</div>
+  <div id="auto-bar-wrap"><div id="auto-bar"></div></div>
+</div>
+
+<div id="countdown"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<script>
+const video         = document.getElementById('videoEl');
+const canvas        = document.getElementById('gameCanvas');
+const ctx           = canvas.getContext('2d');
+const statusEl      = document.getElementById('status');
+const scoreValEl    = document.getElementById('score-val');
+const comboBox      = document.getElementById('combo-box');
+const comboValEl    = document.getElementById('combo-val');
+const livesBox      = document.getElementById('lives-box');
+const startScreen   = document.getElementById('start-screen');
+const gameoverScreen= document.getElementById('gameover-screen');
+const finalScoreEl  = document.getElementById('final-score');
+const countdownEl   = document.getElementById('countdown');
+const startBtn      = document.getElementById('start-btn');
+const restartBtn    = document.getElementById('restart-btn');
+
+// ── State ────────────────────────────────────────────────
+let detector  = null;
+let smoothed  = {};
+let gameState = 'idle'; // idle | countdown | playing | over
+let score     = 0;
+let lives     = 3;
+let combo     = 0;
+let comboTimer= null;
+let fruits    = [];
+let particles = [];
+let catchEffects = [];
+let lastTime  = performance.now(), frames = 0;
+
+// Hand positions (screen px)
+let lHand = null, rHand = null;
+const HAND_RADIUS = 55; // catch radius
+
+// Fruit pool
+const FRUIT_TYPES = [
+  { emoji:'🍎', pts:10, color:'#ff4444' },
+  { emoji:'🍊', pts:10, color:'#ff8800' },
+  { emoji:'🍋', pts:10, color:'#ffdd00' },
+  { emoji:'🍇', pts:15, color:'#9966ff' },
+  { emoji:'🍓', pts:10, color:'#ff3366' },
+  { emoji:'🍉', pts:20, color:'#33cc44' },
+  { emoji:'🍑', pts:10, color:'#ffaa66' },
+  { emoji:'🥝', pts:15, color:'#88cc00' },
+  { emoji:'🫐', pts:15, color:'#6655cc' },
+  { emoji:'🍒', pts:20, color:'#cc1133' },
+  { emoji:'💣', pts:-30, color:'#333333' }, // bomb — lose combo
+];
+
+// ── Helpers ──────────────────────────────────────────────
+function setStatus(t, c) { statusEl.textContent = t; statusEl.className = c; }
+function lerp(a, b, t)   { return a + (b - a) * t; }
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function n2s(nx, ny) {
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const scale = Math.max(sw / vw, sh / vh);
+  const dw = vw * scale, dh = vh * scale;
+  const ox = (sw - dw) / 2, oy = (sh - dh) / 2;
+  return { x: (1 - nx) * dw + ox, y: ny * dh + oy };
+}
+
+const KP = {
+  nose:0,leftEye:1,rightEye:2,leftEar:3,rightEar:4,
+  leftShoulder:5,rightShoulder:6,
+  leftElbow:7,rightElbow:8,
+  leftWrist:9,rightWrist:10,
+  leftHip:11,rightHip:12,
+  leftKnee:13,rightKnee:14,
+  leftAnkle:15,rightAnkle:16
+};
+
+const SKEL = [
+  ['leftShoulder','rightShoulder','#6ee7ff'],
+  ['leftShoulder','leftHip','#6ee7ff'],['rightShoulder','rightHip','#6ee7ff'],['leftHip','rightHip','#6ee7ff'],
+  ['leftShoulder','leftElbow','#a78bfa'],['leftElbow','leftWrist','#a78bfa'],
+  ['rightShoulder','rightElbow','#a78bfa'],['rightElbow','rightWrist','#a78bfa'],
+  ['leftHip','leftKnee','#34d399'],['leftKnee','leftAnkle','#34d399'],
+  ['rightHip','rightKnee','#34d399'],['rightKnee','rightAnkle','#34d399'],
+];
+
+function getKP(keypoints, name) {
+  const k = keypoints[KP[name]];
+  if (!k) return null;
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  return { nx: k.x / vw, ny: k.y / vh, score: k.score };
+}
+
+function smKP(name, nx, ny) {
+  if (!smoothed[name]) { smoothed[name] = {nx, ny}; return {nx, ny}; }
+  smoothed[name].nx = lerp(smoothed[name].nx, nx, 0.45);
+  smoothed[name].ny = lerp(smoothed[name].ny, ny, 0.45);
+  return { nx: smoothed[name].nx, ny: smoothed[name].ny };
+}
+
+// ── Lives display ────────────────────────────────────────
+function updateLives() {
+  livesBox.textContent = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
+}
+
+// ── Score & Combo ────────────────────────────────────────
+function addScore(pts, x, y, emoji) {
+  if (gameState !== 'playing') return;
+
+  // Combo
+  combo++;
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => { combo = 0; comboBox.classList.remove('show'); }, 2500);
+
+  const multiplier = combo >= 5 ? 3 : combo >= 3 ? 2 : 1;
+  const gained = pts * multiplier;
+  score = Math.max(0, score + gained);
+  scoreValEl.textContent = score;
+
+  if (combo >= 2) {
+    comboValEl.textContent = multiplier + 'x';
+    comboBox.classList.add('show');
+  }
+
+  // Catch effect
+  catchEffects.push({ x, y, text: (gained > 0 ? '+' : '') + gained, emoji, t: 0, combo: multiplier });
+  spawnParticles(x, y, emoji);
+}
+
+function missedFruit() {
+  if (gameState !== 'playing') return;
+  lives--;
+  combo = 0;
+  comboBox.classList.remove('show');
+  updateLives();
+  // Flash red
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,0,0,0.18)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+  if (lives <= 0) endGame();
+}
+
+// ── Particles ────────────────────────────────────────────
+function spawnParticles(x, y, emoji) {
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 6;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      alpha: 1,
+      size: 8 + Math.random() * 12,
+      emoji,
+      t: 0,
+    });
+  }
+}
+
+// ── Fruit spawning ───────────────────────────────────────
+let fruitTimer = null;
+function scheduleFruit() {
+  if (gameState !== 'playing') return;
+  const delay = Math.max(600, 1800 - score * 1.5);
+  fruitTimer = setTimeout(() => {
+    spawnFruit();
+    scheduleFruit();
+  }, delay);
+}
+
+function spawnFruit() {
+  if (gameState !== 'playing') return;
+  const isBomb = Math.random() < 0.1;
+  const type   = isBomb ? FRUIT_TYPES[FRUIT_TYPES.length - 1]
+                        : FRUIT_TYPES[Math.floor(Math.random() * (FRUIT_TYPES.length - 1))];
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const size = 52 + Math.random() * 24;
+  const x    = size + Math.random() * (sw - size * 2);
+  const vy   = 2.5 + Math.random() * 3;
+  const vx   = (Math.random() - 0.5) * 2.5;
+  const wobble = (Math.random() - 0.5) * 0.04;
+
+  fruits.push({
+    type, x, y: -size * 2,
+    vx, vy, size, wobble,
+    angle: 0, spin: (Math.random() - 0.5) * 0.06,
+    caught: false, missed: false,
+    flash: 0,
+  });
+}
+
+// ── Game loop ────────────────────────────────────────────
+function updateFruits() {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  fruits.forEach(f => {
+    if (f.caught || f.missed) return;
+    f.vy += 0.12; // gravity
+    f.x  += f.vx + Math.sin(f.angle * 3) * f.wobble * 30;
+    f.y  += f.vy;
+    f.angle += f.spin;
+    if (f.flash > 0) f.flash--;
+
+    // Check catch with hands
+    [lHand, rHand].forEach(hand => {
+      if (!hand || f.caught) return;
+      const dx = hand.x - f.x, dy = hand.y - f.y;
+      if (Math.sqrt(dx*dx + dy*dy) < HAND_RADIUS + f.size * 0.5) {
+        f.caught = true;
+        addScore(f.type.pts, f.x, f.y, f.type.emoji);
+      }
+    });
+
+    // Off screen = missed
+    if (!f.caught && f.y > sh + f.size * 2) {
+      f.missed = true;
+      if (f.type.pts > 0) missedFruit();
+    }
+  });
+  fruits = fruits.filter(f => !f.caught && !f.missed);
+}
+
+function updateParticles() {
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3;
+    p.alpha = Math.max(0, p.alpha - 0.035);
+    p.t++;
+  });
+  particles = particles.filter(p => p.alpha > 0);
+}
+
+function updateCatchEffects() {
+  catchEffects.forEach(e => { e.t++; e.y = (e.y || e.y) - 1.5; });
+  catchEffects = catchEffects.filter(e => e.t < 60);
+}
+
+// ── Draw ─────────────────────────────────────────────────
+function drawSkeleton(keypoints) {
+  const THRESH = 0.15;
+
+  SKEL.forEach(([nameA, nameB, col]) => {
+    const a = getKP(keypoints, nameA), b = getKP(keypoints, nameB);
+    if (!a || !b || a.score < THRESH || b.score < THRESH) return;
+    const sa = smKP(nameA, a.nx, a.ny), sb = smKP(nameB, b.nx, b.ny);
+    const pA = n2s(sa.nx, sa.ny), pB = n2s(sb.nx, sb.ny);
+
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.lineWidth = 16; ctx.strokeStyle = col + '11';
+    ctx.beginPath(); ctx.moveTo(pA.x,pA.y); ctx.lineTo(pB.x,pB.y); ctx.stroke();
+    ctx.lineWidth = 7; ctx.strokeStyle = col + '35';
+    ctx.beginPath(); ctx.moveTo(pA.x,pA.y); ctx.lineTo(pB.x,pB.y); ctx.stroke();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = col;
+    ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.moveTo(pA.x,pA.y); ctx.lineTo(pB.x,pB.y); ctx.stroke();
+    ctx.restore();
+  });
+
+  // Dots
+  Object.keys(KP).forEach(name => {
+    const k = getKP(keypoints, name);
+    if (!k || k.score < THRESH) return;
+    const s = smKP(name + '_d', k.nx, k.ny);
+    const p = n2s(s.nx, s.ny);
+    const isHead = ['nose','leftEye','rightEye','leftEar','rightEar'].includes(name);
+    const isArm  = name.includes('Shoulder')||name.includes('Elbow')||name.includes('Wrist');
+    const col = isHead ? '#6ee7ff' : isArm ? '#a78bfa' : '#34d399';
+    const r = isHead ? 6 : 4;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r+5, 0, Math.PI*2);
+    ctx.fillStyle = col+'14'; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 18; ctx.globalAlpha = 0.92; ctx.fill();
+    ctx.restore();
+  });
+
+  // Head circle
+  const nose = getKP(keypoints, 'nose');
+  if (nose && nose.score >= THRESH) {
+    const lEar=getKP(keypoints,'leftEar'), rEar=getKP(keypoints,'rightEar');
+    const lSh=getKP(keypoints,'leftShoulder'), rSh=getKP(keypoints,'rightShoulder');
+    const sn = smKP('nose', nose.nx, nose.ny);
+    const pn = n2s(sn.nx, sn.ny);
+    let r = 55;
+    if (lEar&&rEar&&lEar.score>THRESH&&rEar.score>THRESH) {
+      const pL=n2s(lEar.nx,lEar.ny),pR=n2s(rEar.nx,rEar.ny);
+      r = Math.abs(pL.x-pR.x)*0.65;
+    } else if (lSh&&rSh&&lSh.score>THRESH&&rSh.score>THRESH) {
+      const pL=n2s(lSh.nx,lSh.ny),pR=n2s(rSh.nx,rSh.ny);
+      r = Math.abs(pL.x-pR.x)*0.30;
+    }
+    r = Math.max(28, Math.min(r, 130));
+    const cx=pn.x, cy=pn.y-r*0.18;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,r+7,0,Math.PI*2);
+    ctx.strokeStyle='#6ee7ff12'; ctx.lineWidth=10; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle='#6ee7ff'; ctx.lineWidth=2.5;
+    ctx.shadowColor='#6ee7ff'; ctx.shadowBlur=18; ctx.globalAlpha=0.82; ctx.stroke();
+    ctx.restore();
+  }
+
+  // Hand rings
+  [lHand, rHand].forEach((hand, i) => {
+    if (!hand) return;
+    const col = i === 0 ? '#f9a8d4' : '#fbbf24';
+    ctx.save();
+    ctx.beginPath(); ctx.arc(hand.x, hand.y, HAND_RADIUS, 0, Math.PI*2);
+    ctx.strokeStyle = col; ctx.lineWidth = 3;
+    ctx.shadowColor = col; ctx.shadowBlur = 20; ctx.globalAlpha = 0.55;
+    ctx.setLineDash([8, 6]); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawFruits() {
+  fruits.forEach(f => {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.angle);
+    ctx.font = `${f.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (f.type.pts < 0) {
+      ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 20;
+    }
+    ctx.fillText(f.type.emoji, 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.font = `${p.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.emoji, p.x, p.y);
+    ctx.restore();
+  });
+}
+
+function drawCatchEffects() {
+  catchEffects.forEach(e => {
+    const alpha = Math.max(0, 1 - e.t / 60);
+    const scale = 1 + (e.combo > 1 ? 0.3 : 0) + e.t * 0.01;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `bold ${Math.round(22 * scale)}px 'Courier New'`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = e.combo >= 3 ? '#facc15' : e.combo >= 2 ? '#fb923c' : '#ffffff';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12;
+    const initY = e.y + e.t * 1.5;
+    ctx.fillText(e.text, e.x, initY);
+    ctx.restore();
+  });
+}
+
+// ── Pose processing ───────────────────────────────────────
+// Elbow->Wrist vektörünü uzatarak gerçek el ucunu tahmin et
+function estimateHandTip(elbowKP, wristKP, extend) {
+  if (!elbowKP || !wristKP) return wristKP;
+  return {
+    nx: wristKP.nx + (wristKP.nx - elbowKP.nx) * extend,
+    ny: wristKP.ny + (wristKP.ny - elbowKP.ny) * extend,
+    score: wristKP.score
+  };
+}
+
+function processPose(keypoints) {
+  const THRESH = 0.15;
+  const lw = getKP(keypoints, 'leftWrist');
+  const rw = getKP(keypoints, 'rightWrist');
+  const le = getKP(keypoints, 'leftElbow');
+  const re = getKP(keypoints, 'rightElbow');
+  const EXTEND = 0.6; // bilekten el ucuna ekstra mesafe
+
+  if (lw && lw.score >= THRESH) {
+    const tip = estimateHandTip(le && le.score >= THRESH ? le : null, lw, EXTEND);
+    const s = smKP('lHand', tip.nx, tip.ny);
+    lHand = n2s(s.nx, s.ny);
+  } else { lHand = null; }
+
+  if (rw && rw.score >= THRESH) {
+    const tip = estimateHandTip(re && re.score >= THRESH ? re : null, rw, EXTEND);
+    const s = smKP('rHand', tip.nx, tip.ny);
+    rHand = n2s(s.nx, s.ny);
+  } else { rHand = null; }
+}
+
+// ── Main loop ────────────────────────────────────────────
+async function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Pose detect
+  if (detector && video.readyState >= 2) {
+    try {
+      const poses = await detector.estimatePoses(video, { flipHorizontal: false });
+      frames++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) { lastTime = now; frames = 0; }
+
+      if (poses && poses.length > 0) {
+        processPose(poses[0].keypoints);
+        setStatus('Algılandı ✓', 'ready');
+        drawSkeleton(poses[0].keypoints);
+      } else {
+        lHand = null; rHand = null;
+        smoothed = {};
+        setStatus('Aranıyor…', 'noperson');
+      }
+    } catch(e) { /* ignore frame errors */ }
+  }
+
+  if (gameState === 'playing') {
+    updateFruits();
+    updateParticles();
+    drawFruits();
+    drawParticles();
+    drawCatchEffects();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Game flow ─────────────────────────────────────────────
+function startCountdown(cb) {
+  countdownEl.style.display = 'flex';
+  let n = 3;
+  countdownEl.textContent = n;
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0) {
+      clearInterval(iv);
+      countdownEl.style.display = 'none';
+      cb();
+    } else {
+      countdownEl.textContent = n;
+    }
+  }, 1000);
+}
+
+function startGame() {
+  score = 0; lives = 3; combo = 0; fruits = []; particles = []; catchEffects = [];
+  scoreValEl.textContent = 0;
+  updateLives();
+  comboBox.classList.remove('show');
+  gameoverScreen.style.display = 'none';
+  startScreen.style.display = 'none';
+
+  startCountdown(() => {
+    gameState = 'playing';
+    scheduleFruit();
+    // spawn first immediately
+    spawnFruit(); spawnFruit();
+  });
+}
+
+let autoRestartTimer = null;
+let autoRestartInterval = null;
+
+function endGame() {
+  gameState = 'over';
+  clearTimeout(fruitTimer);
+  fruits = [];
+  finalScoreEl.textContent = 'Puan: ' + score;
+  gameoverScreen.style.display = 'flex';
+  startAutoRestart();
+}
+
+function startAutoRestart() {
+  clearTimeout(autoRestartTimer);
+  clearInterval(autoRestartInterval);
+  const autoRestartEl = document.getElementById('auto-restart');
+  const autoBar = document.getElementById('auto-bar');
+  const SECS = 5;
+  let remaining = SECS;
+  autoRestartEl.textContent = remaining + ' saniyede otomatik başlıyor…';
+  autoBar.style.transition = 'none';
+  autoBar.style.width = '100%';
+  // force reflow then animate
+  autoBar.getBoundingClientRect();
+  autoBar.style.transition = 'width ' + SECS + 's linear';
+  autoBar.style.width = '0%';
+
+  autoRestartInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(autoRestartInterval);
+      autoRestartEl.textContent = 'Başlıyor!';
+    } else {
+      autoRestartEl.textContent = remaining + ' saniyede otomatik başlıyor…';
+    }
+  }, 1000);
+
+  autoRestartTimer = setTimeout(() => {
+    startGame();
+  }, SECS * 1000);
+}
+
+function cancelAutoRestart() {
+  clearTimeout(autoRestartTimer);
+  clearInterval(autoRestartInterval);
+  const autoRestartEl = document.getElementById('auto-restart');
+  const autoBar = document.getElementById('auto-bar');
+  if (autoRestartEl) autoRestartEl.textContent = '';
+  if (autoBar) { autoBar.style.transition = 'none'; autoBar.style.width = '0%'; }
+}
+
+startBtn.addEventListener('click', async () => {
+  startScreen.style.display = 'none';
+  if (!detector) await initDetector();
+  startGame();
+});
+restartBtn.addEventListener('click', () => { cancelAutoRestart(); startGame(); });
+document.addEventListener('mousemove', () => { if (gameState === 'over') cancelAutoRestart(); });
+
+// ── Init ─────────────────────────────────────────────────
+async function initCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' }
+    });
+    video.srcObject = stream;
+    await new Promise(r => { video.onloadedmetadata = r; });
+    video.play();
+  } catch(e) {
+    setStatus('Kamera Hatası', 'error'); console.error(e);
+  }
+}
+
+async function initDetector() {
+  setStatus('Model yükleniyor…', 'loading');
+  try {
+    detector = await poseDetection.createDetector(
+      poseDetection.SupportedModels.MoveNet,
+      { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING, enableSmoothing: true }
+    );
+    setStatus('Hazır', 'ready');
+  } catch(e) {
+    setStatus('Model Hatası', 'error'); console.error(e);
+  }
+}
+
+(async () => {
+  await initCamera();
+  await initDetector();
+  gameLoop();
+})();
+</script>
+</body>
+</html>
