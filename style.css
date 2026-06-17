@@ -1,0 +1,91 @@
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; width:100vw; height:100vh; font-family:'Courier New',monospace; user-select:none; }
+
+#videoEl {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  object-fit:cover; transform:scaleX(-1); z-index:1;
+}
+#gameCanvas {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  z-index:2; pointer-events:none;
+}
+
+/* HUD */
+#score-box {
+  position:fixed; top:16px; left:50%; transform:translateX(-50%);
+  z-index:10; text-align:center;
+}
+#score-label { font-size:11px; letter-spacing:0.2em; color:rgba(255,255,255,0.4); text-transform:uppercase; }
+#score-val   { font-size:52px; font-weight:bold; color:#fff; line-height:1; text-shadow:0 0 30px rgba(255,255,100,0.6); }
+
+#combo-box {
+  position:fixed; top:90px; left:50%; transform:translateX(-50%);
+  z-index:10; font-size:16px; color:#facc15; letter-spacing:0.1em;
+  opacity:0; transition:opacity 0.3s;
+}
+#combo-box.show { opacity:1; }
+
+#lives-box {
+  position:fixed; top:16px; left:16px; z-index:10;
+  font-size:28px; letter-spacing:4px;
+}
+
+#status {
+  position:fixed; top:16px; right:16px; z-index:10;
+  font-size:11px; letter-spacing:0.12em; padding:4px 13px;
+  border-radius:20px; border:1px solid; transition:all 0.4s; text-transform:uppercase;
+}
+#status.loading { color:#facc15; border-color:#facc15; background:rgba(0,0,0,0.7); }
+#status.ready   { color:#4ade80; border-color:#4ade80; background:rgba(0,0,0,0.7); }
+#status.noperson{ color:#a78bfa; border-color:#a78bfa; background:rgba(0,0,0,0.7); }
+#status.error   { color:#f87171; border-color:#f87171; background:rgba(0,0,0,0.7); }
+
+/* Start screen */
+#start-screen {
+  position:fixed; inset:0; z-index:30; background:rgba(5,5,15,0.96);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+}
+#start-screen h1 { font-size:36px; color:#fff; letter-spacing:0.1em; }
+#start-screen p  { font-size:13px; color:rgba(255,255,255,0.4); letter-spacing:0.08em; text-align:center; line-height:1.9; }
+#start-btn {
+  background:transparent; border:2px solid #facc15; color:#facc15;
+  font-family:'Courier New',monospace; font-size:14px; letter-spacing:0.2em;
+  padding:14px 40px; border-radius:4px; cursor:pointer; transition:all 0.3s; text-transform:uppercase;
+  margin-top:8px;
+}
+#start-btn:hover { background:rgba(250,204,21,0.12); box-shadow:0 0 28px rgba(250,204,21,0.25); }
+
+/* Game over */
+#gameover-screen {
+  position:fixed; inset:0; z-index:30; background:rgba(5,5,15,0.95);
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+}
+#gameover-screen h2 { font-size:42px; color:#f87171; letter-spacing:0.1em; }
+#final-score { font-size:22px; color:#fff; }
+#restart-btn {
+  background:transparent; border:2px solid #4ade80; color:#4ade80;
+  font-family:'Courier New',monospace; font-size:13px; letter-spacing:0.2em;
+  padding:12px 34px; border-radius:4px; cursor:pointer; transition:all 0.3s; text-transform:uppercase;
+}
+#restart-btn:hover { background:rgba(74,222,128,0.1); }
+#auto-restart { font-size:12px; color:rgba(255,255,255,0.35); letter-spacing:0.1em; margin-top:2px; }
+#auto-bar-wrap { width:200px; height:3px; background:rgba(255,255,255,0.12); border-radius:2px; overflow:hidden; }
+#auto-bar { height:100%; background:#4ade80; width:100%; }
+
+/* Countdown */
+#countdown {
+  position:fixed; inset:0; z-index:25; display:none;
+  align-items:center; justify-content:center;
+  font-size:120px; font-weight:bold; color:#fff;
+  text-shadow:0 0 60px rgba(255,255,255,0.5);
+}
+
+/* Pause screen */
+#pause-screen {
+  position:fixed; inset:0; z-index:20; background:rgba(5,5,15,0.75);
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  backdrop-filter: blur(2px);
+}
+#pause-screen .pause-icon { font-size:64px; }
+#pause-screen h3 { font-size:28px; color:#fff; letter-spacing:0.1em; }
+#pause-screen p  { font-size:13px; color:rgba(255,255,255,0.45); letter-spacing:0.08em; }
